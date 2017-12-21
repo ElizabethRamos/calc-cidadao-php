@@ -5,9 +5,9 @@ class Selic extends CI_Controller {
 
   public function index()
   {
-    $dataInicial = "30/09/2015";
-    $dataFinal = "30/09/2016";
-    $valorCorrecao = "2000,00";
+    $dataInicial = $this->input->post('dataInicial');
+    $dataFinal = $this->input->post('dataFinal');
+    $valorCorrecao = $this->input->post('valorCorrecao');
 
     $valorCorrigido = $this->_get_valor_corrigido($dataInicial, $dataFinal, $valorCorrecao);
 
@@ -23,8 +23,38 @@ class Selic extends CI_Controller {
   private function _get_valor_corrigido($dataInicial, $dataFinal, $valorCorrecao)
   {
     //Chama endpoint do Bacen
-    return "R$ 2000,00";
+    $url = 'https://www3.bcb.gov.br/CALCIDADAO/publico/corrigirPelaSelic.do?method=corrigirPelaSelic';
+    $values = array('dataInicial' => $dataInicial,
+                      'dataFinal'=> $dataFinal,
+                      'valorCorrecao' => $valorCorrecao);
 
+    // https://stackoverflow.com/questions/5647461/how-do-i-send-a-post-request-with-php
+    $options = array(
+        'http' => array(
+            'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
+            'method'  => 'POST',
+            'content' => http_build_query($values)
+        )
+    );
+    $context  = stream_context_create($options);
+    $result = file_get_contents($url, false, $context);
+    if ($result === FALSE) { var_dump($result); }
+
+    $valorCorrigido = $this->_parse_bacen_response($result);
+    return $valorCorrigido;
+  }
+
+  private function _parse_bacen_response($html)
+  {
+    $doc = new DOMDocument();
+    libxml_use_internal_errors(true);
+    $doc->loadHTML($html);
+
+    $xpath = new DOMXpath($doc);
+    $path = '//form/div[2]/table/tbody/tr[8]/td[2]';
+
+    $valorCorrigido = $xpath->query($path)->item(0)->nodeValue;
+    return $valorCorrigido;
   }
 
 }
